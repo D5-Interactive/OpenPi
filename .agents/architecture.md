@@ -27,12 +27,15 @@ src/openpi/
   pi/transcript.py       pure reducer: pi events/entries -> blocks (user, text, thinking, tool…)
   pi/index.py            read-only scan of ~/.pi/agent/sessions for the rail
   pi/doctor.py           one-shot RPC probe behind `openpi doctor`
-  ui/window.py           MainWindow: project rail, session rail, pane stack, status bar
+  pi/providers.py        local-server autodetect + pi `models.json` configuration
+  ui/window.py           MainWindow: hideable project→session tree, pane stack, theme/zoom
   ui/pane.py             SessionPane: header controls, transcript, composer, footer
   ui/transcript.py       BlockWidget + TranscriptView (incremental, capped at 200 blocks)
   ui/composer.py         input box, send/stop, queue count, `/` command menu
   ui/dialogs.py          extension_ui_request dialogs (select/confirm/input/editor)
-  ui/theme.py            palette + QSS
+  ui/theme.py            Palette per mode, generated QSS, zoom (Ctrl+/-), module color aliases
+  ui/model_selector.py   searchable, provider-grouped, favorite-pinning model picker
+  ui/settings.py         settings dialog: appearance, providers, favorites
   ui/markdown.py         markdown-it-py -> Qt rich text
   ui/tasks.py            thread + signal helper for scans
   server/hub.py          SessionHub: owns sessions, snapshots, block patches, cross-thread calls

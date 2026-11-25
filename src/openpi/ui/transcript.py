@@ -87,8 +87,8 @@ class BlockWidget(QFrame):
         self.detail = QLabel()
         self.detail.setWordWrap(True)
         self.detail.setStyleSheet(
-            f"font-family:{theme.MONO}; font-size:11.5px; color:#b9c2d0;"
-            f"background:#191c22; border-radius:6px; padding:8px;"
+            f"font-family:{theme.MONO}; font-size:11.5px; color:{theme.CODE_FG};"
+            f"background:{theme.CODE_BG}; border-radius:6px; padding:8px;"
         )
         self.detail.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.detail.setVisible(False)
@@ -104,10 +104,10 @@ class BlockWidget(QFrame):
         self.detail.setVisible(self._detail_visible)
         self.toggle.setText("▾" if self._detail_visible else "▸")
 
-    def update_block(self, block, streaming: bool) -> None:
+    def update_block(self, block, streaming: bool, force: bool = False) -> None:
         signature = (block.kind, block.text, block.result, block.name, block.is_error,
                      block.duration_ms, tuple(sorted(block.args.items())), streaming)
-        if signature == self._signature:
+        if signature == self._signature and not force:
             return
         self._signature = signature
 
@@ -176,7 +176,15 @@ class TranscriptView(QScrollArea):
         bar = self.verticalScrollBar()
         return bar.value() >= bar.maximum() - 48
 
-    def render(self, transcript) -> None:
+    def rebuild(self, transcript) -> None:
+        """Drop and recreate every widget so inline theme colors are re-read (theme switch)."""
+        for uid in list(self._widgets):
+            widget = self._widgets.pop(uid)
+            self._layout.removeWidget(widget)
+            widget.deleteLater()
+        self.render(transcript)
+
+    def render(self, transcript, force: bool = False) -> None:
         should_scroll = self._near_bottom()
         blocks = transcript.blocks[-MAX_BLOCKS:]
         keep = {b.uid for b in blocks}
@@ -191,7 +199,8 @@ class TranscriptView(QScrollArea):
                 widget = BlockWidget(block)
                 self._widgets[block.uid] = widget
                 self._layout.addWidget(widget)
-            widget.update_block(block, streaming=transcript.streaming and index == len(blocks) - 1)
+            widget.update_block(block, streaming=transcript.streaming and index == len(blocks) - 1,
+                                force=force)
         if should_scroll:
             QTimer.singleShot(0, self._scroll_to_bottom)
 

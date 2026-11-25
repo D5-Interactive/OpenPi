@@ -1,8 +1,8 @@
-"""Main window: project rail, session rail, one pane per open session.
+"""Main window: hideable project→session sidebar, one pane per open session.
 
 The session backend is either local (spawn `pi --mode rpc`) or remote (attach to an openpi
-server over its SSE/HTTP protocol). `SessionPane` does not care which: both backends expose the
-same signals and methods.
+server). `SessionPane` does not care which. Theme and zoom live in `config.Settings`; `Ctrl+B`
+toggles the sidebar, `Ctrl+`/`Ctrl-`/`Ctrl+0` zoom.
 """
 
 from __future__ import annotations
@@ -16,8 +16,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -25,6 +23,8 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QSystemTrayIcon,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -35,7 +35,9 @@ from openpi.pi.process import pi_binary
 from openpi.pi.session import PiSession
 from openpi.server.client import RemoteClient, RemoteSession
 
+from . import theme
 from .pane import SessionPane
+from .settings import SettingsDialog
 from .tasks import run_async
 
 
@@ -57,19 +59,21 @@ class MainWindow(QMainWindow):
         self.resize(1180, 760)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._build_rail())
+        self.rail = self._build_rail()
+        splitter.addWidget(self.rail)
         self.stack = QStackedWidget()
         self.stack.addWidget(self._placeholder())
         splitter.addWidget(self.stack)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([260, 920])
+        splitter.setSizes([280, 900])
         self.setCentralWidget(splitter)
         self.statusBar().showMessage("connected" if remote else "pi not started")
 
         self._streaming = 0
         self._tray = None
         self._setup_tray()
+        self._apply_theme()
         self._load_projects(project)
         self._refresh_sessions()
 
@@ -77,36 +81,48 @@ class MainWindow(QMainWindow):
 
     def _build_rail(self) -> QWidget:
         rail = QWidget()
-        rail.setMaximumWidth(320)
+        rail.setMinimumWidth(240)
+        rail.setMaximumWidth(380)
         layout = QVBoxLayout(rail)
         layout.setContentsMargins(6, 8, 6, 8)
-        layout.setSpacing(4)
+        layout.setSpacing(6)
 
-        layout.addWidget(self._section("Projects"))
-        self.projects = QListWidget()
-        self.projects.currentRowChanged.connect(self._project_changed)
-        self.projects.setMaximumHeight(150)
-        self.projects.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.projects.setTextElideMode(Qt.TextElideMode.ElideMiddle)
-        layout.addWidget(self.projects)
-        add = QPushButton("Add folder…")
-        add.clicked.connect(self._add_project)
-        layout.addWidget(add)
+        header = QHBoxLayout()
+        self.hide_button = QPushButton("☰")
+        self.hide_button.setObjectName("flat")
+        self.hide_button.setFixedWidth(30)
+        self.hide_button.setToolTip("Hide sidebar (Ctrl+B)")
+        self.hide_button.clicked.connect(self._toggle_sidebar)
+        title = QLabel("openpi")
+        title.setStyleSheet("font-weight:700; font-size:14px;")
+        self.settings_button = QPushButton("⚙")
+        self.settings_button.setObjectName("flat")
+        self.settings_button.setFixedWidth(30)
+        self.settings_button.setToolTip("Settings")
+        self.settings_button.clicked.connect(self._open_settings)
+        header.addWidget(self.hide_button)
+        header.addWidget(title, 1)
+        header.addWidget(self.settings_button)
+        layout.addLayout(header)
 
-        layout.addWidget(self._section("Sessions"))
-        self.sessions = QListWidget()
-        self.sessions.itemClicked.connect(self._open_from_item)
-        self.sessions.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        layout.addWidget(self.sessions, 1)
+        layout.addWidget(self._section("Projects · Sessions"))
+        self.tree = QTreeWidget()
+        self.tree.setHeaderHidden(True)
+        self.tree.setIndentation(16)
+        self.tree.itemClicked.connect(self._tree_clicked)
+        layout.addWidget(self.tree, 1)
 
         row = QHBoxLayout()
-        new = QPushButton("+ New session")
+        add = QPushButton("+ folder")
+        add.clicked.connect(self._add_project)
+        new = QPushButton("+ session")
         new.clicked.connect(lambda: self._open(None))
         rescan = QPushButton("↻")
-        rescan.setFixedWidth(32)
+        rescan.setFixedWidth(30)
         rescan.setToolTip("Rescan sessions")
         rescan.clicked.connect(self._refresh_sessions)
-        row.addWidget(new, 1)
+        row.addWidget(add)
+        row.addWidget(new)
         row.addWidget(rescan)
         layout.addLayout(row)
         return rail
@@ -124,39 +140,22 @@ class MainWindow(QMainWindow):
         label.setObjectName("muted")
         return label
 
-    # -- projects --------------------------------------------------------
+    # -- projects / sessions tree ----------------------------------------
 
     def _load_projects(self, project: str | None) -> None:
         wanted = project or self.settings.last_project or str(Path.cwd())
         if wanted not in self.settings.projects:
             self.settings.projects.insert(0, wanted)
-        self.projects.clear()
-        for path in self.settings.projects:
-            item = QListWidgetItem(path)
-            item.setToolTip(path)
-            self.projects.addItem(item)
-        index = self.projects.findItems(wanted, Qt.MatchFlag.MatchExactly)
-        self.projects.setCurrentRow(self.projects.row(index[0]) if index else 0)
-
-    def _project_changed(self, row: int) -> None:
-        if row < 0:
-            return
-        self._project = self.projects.item(row).text()
-        self.settings.last_project = self._project
+        self._project = wanted
+        self.settings.last_project = wanted
         config.save(self.settings, self.state_dir)
-        self.setWindowTitle(f"openpi — {self._project}")
-        self._refresh_sessions()
 
     def _add_project(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Add project folder", self._project or "")
-        if not path:
-            return
-        if path not in self.settings.projects:
+        if path and path not in self.settings.projects:
             self.settings.projects.insert(0, path)
             config.save(self.settings, self.state_dir)
-        self._load_projects(path)
-
-    # -- session listing --------------------------------------------------
+            self._refresh_sessions()
 
     def _refresh_sessions(self) -> None:
         if self._remote:
@@ -169,42 +168,54 @@ class MainWindow(QMainWindow):
     def _fill_local(self, metas) -> None:
         rows = [{"key": str(m.path), "title": m.title, "cwd": m.cwd, "path": str(m.path),
                  "preview": m.preview, "id": m.id, "busy": False} for m in metas]
-        self._fill_sessions(rows, filter_by_cwd=True)
+        self._fill_tree(rows)
 
     def _fill_remote(self, state: dict) -> None:
         rows = [{"key": s["key"], "title": s.get("title") or s.get("cwd", ""),
                  "cwd": s.get("cwd", ""), "path": None, "preview": "", "id": s["key"],
                  "busy": s.get("busy", False)} for s in state.get("sessions", [])]
-        self._fill_sessions(rows, filter_by_cwd=False)
+        self._fill_tree(rows)
 
-    def _fill_sessions(self, rows: list[dict], filter_by_cwd: bool) -> None:
+    def _fill_tree(self, rows: list[dict]) -> None:
         self._metas = rows
-        self.sessions.clear()
-        visible = [r for r in rows if not filter_by_cwd or r["cwd"] == self._project]
-        for row in visible:
-            live = row["key"] in self._panes
-            mark = "●" if (live or row["busy"]) else "○"
-            item = QListWidgetItem(f"{mark} {row['title'][:60]}")
-            item.setData(Qt.ItemDataRole.UserRole, row["key"])
-            item.setToolTip(f"{row['cwd']}\n{row['preview'] or row['id']}")
-            self.sessions.addItem(item)
-        if not visible:
-            hint = QListWidgetItem("no sessions in this folder yet")
-            hint.setFlags(Qt.ItemFlag.NoItemFlags)
-            self.sessions.addItem(hint)
+        self.tree.clear()
+        cwds = list(self.settings.projects)
+        for row in rows:
+            if row["cwd"] and row["cwd"] not in cwds:
+                cwds.append(row["cwd"])
+        for cwd in cwds:
+            project_item = QTreeWidgetItem(self.tree)
+            project_item.setText(0, f"📁 {Path(cwd).name if cwd else '(no folder)'}")
+            project_item.setToolTip(0, cwd or "")
+            project_item.setData(0, Qt.ItemDataRole.UserRole, ("project", cwd))
+            project_item.setExpanded(cwd == self._project)
+            for row in [r for r in rows if r["cwd"] == cwd]:
+                child = QTreeWidgetItem(project_item)
+                live = row["key"] in self._panes
+                mark = "●" if (live or row["busy"]) else "○"
+                child.setText(0, f"{mark} {row['title'][:48]}")
+                child.setToolTip(0, f"{row['cwd']}\n{row['preview'] or row['id']}")
+                child.setData(0, Qt.ItemDataRole.UserRole, ("session", row["key"]))
         self._update_status()
 
-    def _open_from_item(self, item: QListWidgetItem) -> None:
-        key = item.data(Qt.ItemDataRole.UserRole)
-        if not key:
+    def _tree_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
+        data = item.data(0, Qt.ItemDataRole.UserRole)
+        if not data:
             return
-        if key in self._panes:
-            self.stack.setCurrentWidget(self._panes[key])
-            self._panes[key].composer.focus()
-            return
-        meta = next((m for m in self._metas if m["key"] == key), None)
-        if meta:
-            self._open(meta)
+        kind, value = data
+        if kind == "project":
+            self._project = value
+            self.settings.last_project = value
+            config.save(self.settings, self.state_dir)
+            self._refresh_sessions()
+        elif kind == "session":
+            if value in self._panes:
+                self.stack.setCurrentWidget(self._panes[value])
+                self._panes[value].composer.focus()
+                return
+            meta = next((m for m in self._metas if m["key"] == value), None)
+            if meta:
+                self._open(meta)
 
     # -- opening ---------------------------------------------------------
 
@@ -258,9 +269,12 @@ class MainWindow(QMainWindow):
         if rekey_by_file:
             session.ready.connect(lambda: self._session_ready(pane, session, key))
         session.changed.connect(self._update_status)
-        session.state_changed.connect(self._update_status)
+        session.state_changed.connect(lambda: self._pane_state_changed(pane))
         session.start()
         pane.composer.focus()
+        self._update_status()
+
+    def _pane_state_changed(self, pane: SessionPane) -> None:
         self._update_status()
 
     def _session_ready(self, pane: SessionPane, session: PiSession, key: str) -> None:
@@ -301,6 +315,62 @@ class MainWindow(QMainWindow):
         config.save(self.settings, self.state_dir)
         return answer == QMessageBox.StandardButton.Yes
 
+    # -- theme / settings / sidebar --------------------------------------
+
+    def _apply_theme(self) -> None:
+        app = QApplication.instance()
+        theme.apply(app, self.settings.theme)
+        theme.apply_zoom(app, self.settings.zoom)
+        for pane in self._panes.values():
+            pane.transcript.rebuild(pane.session.transcript)
+
+    def _toggle_sidebar(self) -> None:
+        self.settings.sidebar_visible = not self.settings.sidebar_visible
+        config.save(self.settings, self.state_dir)
+        self.rail.setVisible(self.settings.sidebar_visible)
+        if not self.settings.sidebar_visible:
+            self.statusBar().showMessage("sidebar hidden — Ctrl+B to show", 6000)
+
+    def _open_settings(self) -> None:
+        dialog = SettingsDialog(self.settings, self._build_catalog(), self)
+        if dialog.exec():
+            config.save(self.settings, self.state_dir)
+            self._apply_theme()
+            for pane in self._panes.values():
+                pane.apply_favorites(self.settings.favorite_providers,
+                                     self.settings.favorite_models)
+
+    def _build_catalog(self) -> dict[str, list[str]]:
+        catalog: dict[str, list[str]] = {}
+        for pane in self._panes.values():
+            for model in pane.session.models:
+                catalog.setdefault(model.provider, [])
+                if model.id not in catalog[model.provider]:
+                    catalog[model.provider].append(model.id)
+        return catalog
+
+    def _zoom(self, level: int) -> None:
+        level = max(-4, min(6, level))
+        self.settings.zoom = level
+        config.save(self.settings, self.state_dir)
+        theme.apply_zoom(QApplication.instance(), level)
+
+    def keyPressEvent(self, event) -> None:
+        ctrl = event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        if ctrl and event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+            self._zoom(self.settings.zoom + 1)
+            return
+        if ctrl and event.key() == Qt.Key.Key_Minus:
+            self._zoom(self.settings.zoom - 1)
+            return
+        if ctrl and event.key() == Qt.Key.Key_0:
+            self._zoom(0)
+            return
+        if ctrl and event.key() == Qt.Key.Key_B:
+            self._toggle_sidebar()
+            return
+        super().keyPressEvent(event)
+
     # -- status ----------------------------------------------------------
 
     def _update_status(self) -> None:
@@ -318,6 +388,9 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(" · ".join(parts))
         if streaming and not self.isActiveWindow():
             QApplication.alert(self)
+
+    def session_count(self) -> int:
+        return len(self._panes)
 
     # -- tray ------------------------------------------------------------
 
@@ -349,9 +422,6 @@ class MainWindow(QMainWindow):
         self.show()
         self.raise_()
         self.activateWindow()
-
-    def session_count(self) -> int:
-        return len(self._panes)
 
     # -- shutdown --------------------------------------------------------
 

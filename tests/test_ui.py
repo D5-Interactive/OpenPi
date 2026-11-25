@@ -66,3 +66,40 @@ def test_main_window_constructs_without_sessions(app, tmp_path):
     window.close()
     window.deleteLater()
     app.processEvents()
+
+
+def test_model_selector_groups_and_pins_favorites(app):
+    from openpi.protocol.records import Model
+    from openpi.ui.model_selector import ModelSelector
+
+    selector = ModelSelector()
+    models = [Model(id="a", provider="p1", name="A"),
+              Model(id="b", provider="p2", name="B"),
+              Model(id="c", provider="p1", name="C")]
+    selector.set_models(models, "p1", "a")
+    selector.set_favorites(["p2"], ["p1/c"])
+    selector._toggle()
+    tree = selector._popup.tree
+    groups = [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())]
+    assert groups[0].startswith("★ p2")
+    first_p1_child = tree.topLevelItem(1).child(0).text(0)
+    assert first_p1_child.startswith("★ C")
+    selector._popup.hide()
+    selector.deleteLater()
+    app.processEvents()
+
+
+def test_settings_dialog_round_trips_theme_and_zoom(app):
+    from openpi import config
+    from openpi.ui.settings import SettingsDialog
+
+    settings = config.Settings(theme="dark", zoom=0)
+    dialog = SettingsDialog(settings, {"p": ["m1", "m2"]})
+    assert dialog.theme.currentText() == "dark"
+    dialog.theme.setCurrentText("light")
+    dialog.zoom.setValue(2)
+    dialog.accept()
+    assert settings.theme == "light"
+    assert settings.zoom == 2
+    dialog.deleteLater()
+    app.processEvents()

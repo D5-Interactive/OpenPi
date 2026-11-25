@@ -32,6 +32,11 @@ class Settings(msgspec.Struct):
     untrusted: list[str] = msgspec.field(default_factory=list)
     last_model: str = ""
     live_cap: int = 8
+    theme: str = "dark"
+    zoom: int = 0
+    sidebar_visible: bool = True
+    favorite_providers: list[str] = msgspec.field(default_factory=list)
+    favorite_models: list[str] = msgspec.field(default_factory=list)
 
 
 class Pairing(msgspec.Struct):

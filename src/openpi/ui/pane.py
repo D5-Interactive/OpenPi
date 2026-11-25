@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from . import theme
 from .composer import Composer
 from .dialogs import handle_ui_request
+from .model_selector import ModelSelector
 from .transcript import TranscriptView
 
 
@@ -48,10 +49,9 @@ class SessionPane(QWidget):
         self.rename_button.setFixedWidth(28)
         self.rename_button.setToolTip("Rename session")
         self.rename_button.clicked.connect(self._rename)
-        self.model = QComboBox()
-        self.model.setMinimumWidth(220)
+        self.model = ModelSelector()
         self.model.setToolTip("Model")
-        self.model.activated.connect(self._model_chosen)
+        self.model.model_chosen.connect(self._model_chosen)
         self.thinking = QComboBox()
         self.thinking.setToolTip("Thinking level")
         self.thinking.activated.connect(self._thinking_chosen)
@@ -126,10 +126,11 @@ class SessionPane(QWidget):
         if ok and name.strip():
             self.session.rename(name.strip())
 
-    def _model_chosen(self, index: int) -> None:
-        data = self.model.itemData(index)
-        if data:
-            self.session.set_model(data[0], data[1])
+    def _model_chosen(self, provider: str, model_id: str) -> None:
+        self.session.set_model(provider, model_id)
+
+    def apply_favorites(self, providers: list[str], models: list[str]) -> None:
+        self.model.set_favorites(providers, models)
 
     def _thinking_chosen(self, index: int) -> None:
         level = self.thinking.itemText(index)
@@ -153,16 +154,9 @@ class SessionPane(QWidget):
         signature = (len(self.session.models), self.session.models[0].id if self.session.models else "")
         if self.session.models and signature != getattr(self, "_model_sig", None):
             self._model_sig = signature
-            self.model.blockSignals(True)
-            current = self.model.currentData()
-            self.model.clear()
-            for model in self.session.models:
-                self.model.addItem(model.name or model.label, (model.provider, model.id))
-            if current:
-                index = self.model.findData(current)
-                if index >= 0:
-                    self.model.setCurrentIndex(index)
-            self.model.blockSignals(False)
+            provider = state.model.provider if state.model else ""
+            model_id = state.model.id if state.model else ""
+            self.model.set_models(self.session.models, provider, model_id)
 
         levels = list(self.session.levels) or ["off", "minimal", "low", "medium", "high"]
         if state.thinking_level not in levels:

@@ -74,6 +74,10 @@ Requires `pi` on `PATH` (tested against 1.5.2). Override with `OPENPI_PI_BINARY=
 - Answer extension dialogs (`ctx.ui.select/confirm/input/editor`) with real Qt dialogs.
 - Show context, token, and cost usage from pi's own numbers.
 - `/` autocomplete for skills, templates, and commands; tray notification when work settles.
+- Light/dark theme, Ctrl+/Ctrl-/Ctrl+0 zoom, and a hideable sidebar grouped by project.
+- A searchable model picker with pinned providers and models (no more off-screen stretching).
+- Settings: appearance, favorites, and local-server autodetection (LM Studio, Ollama, vLLM,
+  llama.cpp, Colibri) that writes pi's `models.json`.
 - Reach the same sessions from a browser or another desktop (`--connect`), including through a
   relay with end-to-end TLS.
 

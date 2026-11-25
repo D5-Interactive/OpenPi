@@ -116,3 +116,19 @@ too surprising to do unprompted.
 `.github/workflows/release.yml` runs tests, checks the `v*` tag matches `pyproject` version,
 builds with `uv build`, publishes with `uv publish --token "$PYPI_TOKEN"` (org-scoped token for
 `pypi.org/org/D5-Interactive/`), then cuts the GitHub release. `ci.yml` runs tests on push/PR.
+
+**24. One palette drives every color; zoom scales the app font (2026-11-25).**
+`ui/theme.py` exposes a `Palette` per mode (dark/light/system) and generates the QSS from it.
+Widgets read module-level color aliases (`theme.ACCENT`, `theme.CODE_BG`, …) that `apply()`
+refreshes, so a mode switch re-renders. Zoom changes the QApplication font point size, so every
+widget scales together and nothing hardcodes pixel sizes beyond base spacing.
+
+**25. Favorites live in openpi settings, never in pi's files (2026-11-25).**
+Pinned providers (`favorite_providers`) and models (`favorite_models` = `provider/id`) are stored
+in `settings.json` and float to the top of the model picker. pi has no notion of openpi's UI
+preferences, so they stay out of `models.json`/`settings.json` under `~/.pi/agent`.
+
+**26. Provider setup writes pi's `models.json` (extends #5, 2026-11-25).**
+`pi/providers.py` detects running local servers and, on save, merges an OpenAI-compatible
+endpoint into `~/.pi/agent/models.json` — the one file pi documents for user-managed compatible
+endpoints. Sessions, catalogs, and pi's own `settings.json` remain read-only to openpi.

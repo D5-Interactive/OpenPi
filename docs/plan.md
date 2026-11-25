@@ -233,3 +233,30 @@ Dev: `pytest` (`uv add --dev pytest`), Qt runs offscreen in CI (`QT_QPA_PLATFORM
    if the session is busy.
 5. **Scheduler** — in-app only (honest limitation) or a `systemd --user` timer that reopens
    openpi headlessly? Proposed: in-app only for v1.
+
+## 5b. UI modernization (current)
+
+Design notes for the visual/UX sweep. Principles: one palette object drives every color (dark +
+light from the same roles); font size is the zoom knob (Ctrl+/Ctrl-/Ctrl+0 change the app
+font, so everything scales, no hardcoded px); nothing stretches off-screen — the model picker
+is a searchable popup, not a wide combo; the sidebar is hideable and groups sessions by
+project.
+
+- **Theme** — `ui/theme.py` exposes `Theme(mode)`, a `palette()` with semantic roles
+  (bg, surface, border, text, muted, accent, success, warning, danger, diff), and `qss()`
+  generated from it. `apply(app)` sets the palette + QSS. Scrollbars, focus rings, selection,
+  and radius are all in the QSS. Modes: dark, light, system (follows `QStyleHints.colorScheme`).
+- **Zoom** — stored in settings; `Ctrl+=`/`Ctrl+-`/`Ctrl+0` scale the app font point size.
+- **Settings** — `ui/settings.py` dialog with tabs: Appearance (theme, zoom), Providers
+  (detect local servers + add/remove to pi's `~/.pi/agent/models.json`), Favorites
+  (pinned providers/models). Persisted in `config.Settings`.
+- **Provider autodetect** — `pi/providers.py` probes known local endpoints
+  (LM Studio :1234, Ollama :11434, vLLM :8000, llama.cpp :8080, Colibri :2345) with `GET
+  /v1/models`; `configure_provider()` merges an OpenAI-compatible endpoint into pi's
+  `models.json`. Favorites are `provider` and `provider/model` strings stored in openpi settings
+  (never in pi's files).
+- **Model picker** — `ui/model_selector.py`: a fixed-width button that opens a popup with a
+  filter box and a provider-grouped list; pinned models float to the top. Replaces the
+  stretching `QComboBox`.
+- **Sidebar** — project→sessions tree (`QTreeWidget`), collapsible, hideable via a hamburger
+  toggle + `Ctrl+B`; state persists.
