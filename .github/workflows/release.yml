@@ -28,6 +28,7 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
+    environment: pypi
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -43,8 +44,9 @@ jobs:
       - name: Build distributions
         run: uv build
 
-      - name: Publish to PyPI (D5-Interactive org)
-        # PYPI_TOKEN must be an org-scoped API token for https://pypi.org/org/D5-Interactive/
+      - name: Publish to PyPI
+        # PYPI_TOKEN is a D5-Interactive personal API token, stored as an environment
+        # secret so only the `pypi` environment (approved by dsient) can use it.
         env:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: uv publish --token "$PYPI_TOKEN"
@@ -52,4 +54,4 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "OpenPi $GITHUB_REF_NAME" --generate-notes
