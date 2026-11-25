@@ -19,7 +19,7 @@ UI, and decision notes. The roadmap is [`docs/plan.md`](docs/plan.md).
 - Releases: `v*` tag matches `pyproject` version; the workflow publishes to PyPI with
   `secrets.PYPI_TOKEN`. Bump the version before tagging.
 - Commits in this repo use the D5-Interactive subject format:
-  `[ o7 ]: <TITLE> | <CONDENSED DESCRIPTION> | <CONDENSED CHANGES>`.
+  `[ o7 ]: <1-3 WORD TITLE> | <1-SENTENCE DESCRIPTION> | <CONDENSED CHANGES>`.
 - Tests stay headless: `QT_QPA_PLATFORM=offscreen` is set by the test fixtures.
 
 ## Layout

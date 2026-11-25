@@ -8,7 +8,8 @@ files. No database, no account, no extension sandbox.
 
 ## Status
 
-M0 (protocol spine), M1 (desktop chat control room), and M2 (web server + relay) are built:
+M0 (protocol spine), M1 (desktop chat control room), and M2 (web server + relay) are built,
+with desktop client mode, per-device pairing tokens, and relay E2E (TLS + CA pinning) on top:
 session list, live multi-session streaming, markdown transcript, tool cards, model/thinking
 pickers, extension dialogs, context/cost footer, project trust, a browser client, and a
 self-hosted relay. M3 (git, branches, worktrees) is next — see [`docs/plan.md`](docs/plan.md).
@@ -16,7 +17,7 @@ self-hosted relay. M3 (git, branches, worktrees) is next — see [`docs/plan.md`
 ## Install
 
 ```bash
-uv tool install openpi              # from PyPI (once published)
+uv tool install openpi              # from PyPI
 # or from source:
 uv tool install git+https://github.com/D5-Interactive/OpenPi
 ```
@@ -31,15 +32,15 @@ server always drive a current pi.
 
 ```bash
 uv sync
-uv run openpi                    # open the app in the current folder
+uv run openpi                    # open the GUI in the current folder
 uv run openpi --project ~/repo   # open a specific folder
-uv run openpi --connect http://host:7717 --token …   # attach to a server
-uv run openpi --connect https://… --tls-ca server.crt # attach over TLS (pinned cert)
-uv run openpi token new --name phone                   # issue a revocable device token
+uv run openpi --connect http://host:7717 --token …   # GUI attached to a server
+uv run openpi --connect https://… --tls-ca server.crt # same, over TLS (pinned cert)
+uv run openpi setup              # create ~/.openpi, install/update pi
 uv run openpi doctor             # pi binary, version, session dir, models
 uv run openpi sessions           # list pi sessions from disk
-uv run pytest                    # 55 tests, headless
-uv run pytest -m live            # plus the real-pi contract tests
+uv run pytest                    # 74 tests, headless
+uv run pytest -m live            # plus 3 live pi/network contract tests
 ```
 
 ## Remote access
@@ -66,11 +67,16 @@ Requires `pi` on `PATH` (tested against 1.5.2). Override with `OPENPI_PI_BINARY=
 
 - Keep every opened session streaming in the background; switching costs nothing.
 - Render text, thinking, tool calls, bash output, compaction, and retries as they happen.
+- Attach images to a prompt (desktop and browser).
 - Answer extension dialogs (`ctx.ui.select/confirm/input/editor`) with real Qt dialogs.
 - Show context, token, and cost usage from pi's own numbers.
-- Review a working-tree diff, stage, and commit with an agent-written message (M2).
-- Branch sessions (`fork`/`clone`), and run sessions inside `git worktree`s (M2).
-- Send one prompt to several models and compare, side by side (M3).
+- `/` autocomplete for skills, templates, and commands; tray notification when work settles.
+- Reach the same sessions from a browser or another desktop (`--connect`), including through a
+  relay with end-to-end TLS.
+
+Planned next (M3 git, M4 orchestration): a working-tree diff pane with agent-written commit
+messages, branch (`fork`/`clone`) and worktree sessions, multi-model runs, scheduled tasks, and
+a diff walkthrough.
 
 It deliberately does **not** reimplement permissions, provider config, MCP, skills, notes, or a
 plugin sandbox: pi already has those.

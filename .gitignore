@@ -14,3 +14,5 @@ wheels/
 
 # OpenCode harness session state
 .opencode/
+
+# `.agents/` is intentionally tracked (agent-facing docs) — never add it here.
