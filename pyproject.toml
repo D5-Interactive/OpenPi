@@ -1,0 +1,33 @@
+[project]
+name = "openpi"
+version = "0.1.0"
+description = "Desktop control room for the pi coding agent"
+readme = "README.md"
+authors = [
+    { name = "dsient", email = "dsient@users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "click>=8.5.1",
+    "cryptography>=50.0.2",
+    "markdown-it-py>=4.3.0",
+    "msgspec>=0.22.0",
+    "pyside6>=6.12.0",
+]
+
+[project.scripts]
+openpi = "openpi:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -m 'not live'"
+markers = ["live: spawns the real pi binary or needs the network"]
+
+[build-system]
+requires = ["uv_build>=0.13.10,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

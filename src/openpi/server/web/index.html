@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>openpi</title>
+<style>
+  :root {
+    --bg:#16181d; --panel:#1c1f26; --panel2:#22262f; --line:#2e333d; --text:#e6e8ec;
+    --dim:#8b93a1; --accent:#6ea8fe; --ok:#4ec9a0; --warn:#e0b050; --err:#e06c75;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; }
+  body { background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;
+         display:flex; flex-direction:column; }
+  header { display:flex; gap:8px; align-items:center; padding:8px 12px; background:var(--panel);
+           border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header .title { font-weight:600; }
+  .pill { font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:999px;
+          padding:2px 8px; }
+  .grow { flex:1; }
+  #sessions { max-width:220px; }
+  #model { max-width:300px; }
+  @media (max-width:560px) { #model, #thinking { flex:1; max-width:none; } }
+  select, textarea, button, input[type=text] { font:inherit; color:var(--text);
+           background:var(--panel2); border:1px solid var(--line); border-radius:7px; padding:5px 8px; }
+  button { cursor:pointer; }
+  button.primary { background:var(--accent); color:#0b1220; border-color:var(--accent); font-weight:600; }
+  main { flex:1; overflow:auto; padding:14px; max-width:920px; width:100%; margin:0 auto; }
+  .msg { margin:0 0 10px; }
+  .role { font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin-bottom:3px; }
+  .user { background:#1f2530; border:1px solid #2a3446; border-radius:8px; padding:9px 11px; }
+  .thinking { color:var(--dim); font-style:italic; border-left:2px solid #3c4350; padding-left:10px; }
+  .tool { border:1px solid var(--line); border-radius:8px; background:var(--panel); overflow:hidden; }
+  .tool summary { padding:7px 10px; font-family:var(--mono); font-size:12px; cursor:pointer;
+                  display:flex; gap:8px; align-items:center; }
+  .tool summary .name { color:var(--accent); }
+  .tool summary .status { margin-left:auto; color:var(--dim); font-size:11px; }
+  .tool pre, .code { font-family:var(--mono); font-size:12px; background:#191c22; color:#c9d1d9;
+                     padding:9px 10px; margin:0; overflow-x:auto; white-space:pre-wrap; }
+  .notice { color:var(--dim); font-size:12px; text-align:center; }
+  .notice.error { color:var(--err); }
+  code { background:#232833; border-radius:4px; padding:1px 4px; font-family:var(--mono); font-size:12.5px; }
+  pre code { background:none; padding:0; }
+  footer { border-top:1px solid var(--line); background:var(--panel); padding:8px 12px env(safe-area-inset-bottom); }
+  .composer { max-width:920px; margin:0 auto; display:flex; flex-direction:column; gap:6px; }
+  .composer textarea { width:100%; min-height:64px; resize:vertical; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .bar .meta { color:var(--dim); font-size:12px; }
+  .status { display:flex; gap:12px; align-items:center; padding:4px 12px; font-size:11px;
+            color:var(--dim); border-top:1px solid var(--line); background:var(--panel); }
+  dialog { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:10px;
+           padding:14px; max-width:520px; width:92vw; }
+  dialog::backdrop { background:rgba(0,0,0,.55); }
+  dialog .opts { display:flex; flex-direction:column; gap:6px; margin:10px 0; }
+  dialog textarea { width:100%; min-height:120px; }
+  .hidden { display:none !important; }
+  .banner { background:#3a2b2e; color:var(--err); padding:6px 12px; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="title">openpi</span>
+  <select id="sessions" title="Sessions"></select>
+  <button id="new" title="Open a new session in this folder">+ session</button>
+  <span class="pill" id="busy"></span>
+  <span class="grow"></span>
+  <select id="model" title="Model"></select>
+  <select id="thinking" title="Thinking level"></select>
+</header>
+<div id="banner" class="banner hidden"></div>
+<main id="transcript"></main>
+<footer>
+  <div class="composer">
+    <textarea id="input" placeholder="Ask pi…  Enter to send, Shift+Enter for a newline"></textarea>
+    <div class="bar">
+      <span class="meta" id="queue"></span>
+      <span class="grow"></span>
+      <button id="attach" type="button" title="Attach images">🖼</button>
+      <span class="meta" id="chips"></span>
+      <input type="file" id="image" accept="image/*" multiple hidden>
+      <button id="stop" class="hidden">Stop</button>
+      <button id="send" class="primary">Send</button>
+    </div>
+  </div>
+</footer>
+<div class="status">
+  <span id="ctx">context —</span>
+  <span id="cost"></span>
+  <span class="grow"></span>
+  <span id="conn">connecting…</span>
+</div>
+
+<dialog id="dialog">
+  <form method="dialog">
+    <div id="dialog-title" style="font-weight:600;margin-bottom:6px"></div>
+    <div id="dialog-message" style="color:var(--dim);margin-bottom:8px"></div>
+    <div id="dialog-body"></div>
+    <div class="bar" style="margin-top:12px;justify-content:flex-end">
+      <button value="cancel">Cancel</button>
+      <button value="ok" class="primary">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+const params = new URLSearchParams(location.search);
+if (params.get("token")) { localStorage.setItem("openpi.token", params.get("token")); }
+const token = localStorage.getItem("openpi.token") || "";
+if (params.get("token")) { params.delete("token"); history.replaceState(null, "", location.pathname); }
+
+const $ = (id) => document.getElementById(id);
+const state = {
+  key: null, blocks: new Map(), order: [], meta: {models: [], levels: [], commands: []},
+  busy: false, queued: [0, 0], cwd: "", source: null, uiRequest: null,
+};
+
+function api(path, options = {}) {
+  const headers = Object.assign({"X-Openpi-Token": token}, options.headers || {});
+  return fetch(path, Object.assign({}, options, {headers})).then(async (response) => {
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || response.status);
+    return response.json();
+  });
+}
+
+function esc(text) {
+  return String(text).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+
+// Deliberately small: fenced code, inline code, bold, italic, headings, list items.
+function md(text) {
+  const lines = esc(text).split("\n");
+  let out = "", inCode = false, list = false;
+  for (const line of lines) {
+    if (line.startsWith("```")) {
+      if (inCode) { out += "</code></pre>"; inCode = false; } else { out += "<pre><code>"; inCode = true; }
+      continue;
+    }
+    if (inCode) { out += line + "\n"; continue; }
+    const item = line.match(/^\s*[-*]\s+(.*)$/);
+    if (item) { if (!list) { out += "<ul>"; list = true; } out += "<li>" + inline(item[1]) + "</li>"; continue; }
+    if (list) { out += "</ul>"; list = false; }
+    const head = line.match(/^(#{1,4})\s+(.*)$/);
+    if (head) { out += `<h${head[1].length + 2}>` + inline(head[2]) + `</h${head[1].length + 2}>`; continue; }
+    if (!line.trim()) { out += "<br>"; continue; }
+    out += "<div>" + inline(line) + "</div>";
+  }
+  if (list) out += "</ul>";
+  if (inCode) out += "</code></pre>";
+  return out;
+}
+function inline(text) {
+  return text
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|\s)\*([^*]+)\*/g, "$1<em>$2</em>");
+}
+
+function blockEl(block) {
+  const wrap = document.createElement("div");
+  wrap.className = "msg";
+  wrap.dataset.uid = block.uid;
+  if (block.kind === "tool" || block.kind === "bash") {
+    wrap.innerHTML = `<details class="tool"><summary><span class="name">${esc(block.name || block.kind)}</span>
+      <span>${esc(block.args && block.args.command ? block.args.command : "")}</span>
+      <span class="status"></span></summary><pre></pre></details>`;
+  } else if (block.kind === "user") {
+    wrap.innerHTML = `<div class="role">you</div><div class="body user"></div>`;
+  } else if (block.kind === "thinking") {
+    wrap.innerHTML = `<div class="role">thinking</div><div class="body thinking"></div>`;
+  } else if (block.kind === "notice") {
+    wrap.innerHTML = `<div class="body notice"></div>`;
+  } else {
+    wrap.innerHTML = `<div class="role">assistant</div><div class="body"></div>`;
+  }
+  updateEl(wrap, block);
+  return wrap;
+}
+
+function updateEl(el, block) {
+  if (block.kind === "tool" || block.kind === "bash") {
+    const summary = el.querySelector("summary");
+    summary.querySelector(".name").textContent = block.name || block.kind;
+    const command = block.args && block.args.command ? block.args.command : "";
+    summary.querySelector("span:nth-child(2)").textContent = command;
+    const status = summary.querySelector(".status");
+    status.textContent = block.is_error ? "✗ error" : (block.duration_ms != null ? `✓ ${block.duration_ms} ms` : (block.result ? "done" : "running"));
+    status.style.color = block.is_error ? "var(--err)" : (block.result || block.duration_ms != null ? "var(--ok)" : "var(--warn)");
+    const body = el.querySelector("pre");
+    const args = Object.entries(block.args || {}).map(([k, v]) => `${k}: ${v}`).join("\n");
+    body.textContent = [args, block.result || ""].filter(Boolean).join("\n\n");
+    return;
+  }
+  const body = el.querySelector(".body");
+  if (block.kind === "thinking") body.textContent = block.text;
+  else if (block.kind === "notice") { body.innerHTML = esc(block.text || ""); if (block.is_error) body.classList.add("error"); }
+  else body.innerHTML = md(block.text || "");
+  if (block.kind === "notice" && block.is_error) body.classList.add("error");
+}
+
+function renderAll() {
+  const main = $("transcript");
+  main.innerHTML = "";
+  for (const uid of state.order) {
+    const block = state.blocks.get(uid);
+    if (block) main.appendChild(blockEl(block));
+  }
+  scrollToBottom(true);
+}
+
+function applyOrder() {
+  const main = $("transcript");
+  for (const uid of state.order) {
+    const el = main.querySelector(`[data-uid="${CSS.escape(uid)}"]`);
+    if (el && el !== main.lastElementChild) main.appendChild(el);
+  }
+}
+
+function upsert(block) {
+  const main = $("transcript");
+  state.blocks.set(block.uid, block);
+  let el = main.querySelector(`[data-uid="${CSS.escape(block.uid)}"]`);
+  if (!el) { el = blockEl(block); main.appendChild(el); }
+  else updateEl(el, block);
+}
+
+function nearBottom() {
+  const main = $("transcript");
+  return main.scrollTop + main.clientHeight >= main.scrollHeight - 60;
+}
+function scrollToBottom(force) {
+  const main = $("transcript");
+  if (force || nearBottom()) requestAnimationFrame(() => { main.scrollTop = main.scrollHeight; });
+}
+
+function setMeta(meta) {
+  if (meta.models) {
+    const select = $("model");
+    select.innerHTML = meta.models.map((m) =>
+      `<option value="${esc(m.provider)}|${esc(m.id)}">${esc(m.name || (m.provider + "/" + m.id))}</option>`).join("");
+  }
+  if (meta.levels) {
+    $("thinking").innerHTML = meta.levels.map((l) => `<option>${esc(l)}</option>`).join("");
+  }
+}
+
+function setState(payload) {
+  if (payload.state) {
+    const s = payload.state;
+    if (s.name) document.title = "openpi — " + s.name;
+    if (s.model) $("model").value = `${s.model.provider}|${s.model.id}`;
+    if (s.thinking) $("thinking").value = s.thinking;
+  }
+  if (payload.stats) {
+    const c = payload.stats.context;
+    $("ctx").textContent = c && c.percent != null ? `context ${c.percent}%` : "context —";
+    $("cost").textContent = payload.stats.cost ? `$${payload.stats.cost.toFixed(2)}` : "";
+  }
+  if (payload.busy != null) {
+    state.busy = payload.busy;
+    $("busy").textContent = payload.busy ? "working" : "idle";
+    $("stop").classList.toggle("hidden", !payload.busy);
+    $("send").textContent = payload.busy ? "Queue" : "Send";
+  }
+  if (payload.queued) {
+    const total = payload.queued[0] + payload.queued[1];
+    $("queue").textContent = total ? `${total} queued` : "";
+  }
+}
+
+function openSession(key) {
+  if (state.source) state.source.close();
+  state.key = key;
+  state.blocks.clear();
+  state.order = [];
+  $("transcript").innerHTML = "";
+  const source = new EventSource(`/api/sessions/${key}/events?token=${encodeURIComponent(token)}`);
+  state.source = source;
+  source.onopen = () => { $("conn").textContent = "connected"; $("banner").classList.add("hidden"); };
+  source.onerror = () => { $("conn").textContent = "reconnecting…"; $("banner").textContent = "connection lost — retrying"; $("banner").classList.remove("hidden"); };
+  source.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.t === "snapshot") {
+      state.order = data.blocks.map((b) => b.uid);
+      state.blocks.clear();
+      for (const block of data.blocks) state.blocks.set(block.uid, block);
+      setMeta(data);
+      setState({state: data.state, stats: data.stats, busy: data.busy, queued: data.queued});
+      renderAll();
+    } else if (data.t === "patch") {
+      if (data.order) { state.order = data.order; }
+      for (const block of data.upsert || []) upsert(block);
+      if (data.order) applyOrder();
+      setState(data);
+      scrollToBottom(false);
+    } else if (data.t === "ui") {
+      showDialog(data.request);
+    } else if (data.t === "notify") {
+      $("banner").textContent = data.message;
+      $("banner").classList.toggle("hidden", !data.message);
+    }
+  };
+  localStorage.setItem("openpi.session", key);
+}
+
+function loadSessions() {
+  return api("/api/state").then((data) => {
+    state.cwd = data.cwd;
+    const select = $("sessions");
+    const current = state.key || localStorage.getItem("openpi.session");
+    select.innerHTML = data.sessions.map((s) =>
+      `<option value="${esc(s.key)}">${esc(s.title || s.cwd)}</option>`).join("");
+    if (!data.sessions.length) {
+      select.innerHTML = `<option value="">no sessions yet</option>`;
+    }
+    if (current && data.sessions.some((s) => s.key === current)) {
+      select.value = current;
+      if (!state.source) openSession(current);
+    } else if (data.sessions.length && !state.source) {
+      select.value = data.sessions[0].key;
+      openSession(data.sessions[0].key);
+    }
+  }).catch((error) => { $("banner").textContent = "cannot reach server: " + error.message; $("banner").classList.remove("hidden"); });
+}
+
+function post(action, body) {
+  if (!state.key) return Promise.resolve();
+  return api(`/api/sessions/${state.key}/${action}`, {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {}),
+  }).catch((error) => { $("banner").textContent = error.message; $("banner").classList.remove("hidden"); });
+}
+
+function send() {
+  const input = $("input");
+  const message = input.value.trim();
+  const images = state.images || [];
+  if (!message && !images.length) return;
+  const action = state.busy ? "steer" : "prompt";
+  input.value = "";
+  post(action, {message, images});
+  state.images = [];
+  $("chips").textContent = "";
+  loadSessionsSoon();
+}
+let reloadTimer = null;
+function loadSessionsSoon() { clearTimeout(reloadTimer); reloadTimer = setTimeout(loadSessions, 800); }
+
+function attachImages(files) {
+  state.images = state.images || [];
+  let pending = files.length;
+  for (const file of files) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      state.images.push({data: String(reader.result).split(",")[1], mimeType: file.type || "image/png"});
+      if (--pending === 0) $("chips").textContent = state.images.length + " image(s) attached";
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function showDialog(request) {
+  state.uiRequest = request;
+  $("dialog-title").textContent = request.title || "pi";
+  $("dialog-message").textContent = request.message || "";
+  const body = $("dialog-body");
+  body.innerHTML = "";
+  if (request.method === "select") {
+    body.innerHTML = `<div class="opts">` + (request.options || []).map((option, i) =>
+      `<button type="button" data-option="${esc(option)}">${esc(option)}</button>`).join("") + `</div>`;
+    body.querySelectorAll("button[data-option]").forEach((button) => {
+      button.onclick = () => answer({value: button.dataset.option});
+    });
+  } else if (request.method === "confirm") {
+    body.innerHTML = "";
+  } else {
+    body.innerHTML = `<textarea>${esc(request.prefill || "")}</textarea>`;
+  }
+  $("dialog").showModal();
+}
+
+function answer(payload) {
+  const request = state.uiRequest;
+  $("dialog").close();
+  if (!request || !state.key) return;
+  state.uiRequest = null;
+  post("answer", Object.assign({id: request.id}, payload));
+}
+
+$("dialog").addEventListener("close", () => {
+  const request = state.uiRequest;
+  if (!request) return;
+  const value = $("dialog").returnValue;
+  const third = $("dialog-body").querySelector("textarea");
+  if (value === "cancel") return answer({cancelled: true});
+  if (request.method === "confirm") return answer({confirmed: true});
+  if (request.method === "input" || request.method === "editor") return answer({value: third ? third.value : ""});
+  answer({cancelled: true});
+});
+$("dialog").addEventListener("cancel", (event) => { event.preventDefault(); answer({cancelled: true}); });
+
+$("send").onclick = send;
+$("stop").onclick = () => post("abort");
+$("attach").onclick = () => $("image").click();
+$("image").onchange = (event) => { if (event.target.files.length) attachImages(event.target.files); event.target.value = ""; };
+$("input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); }
+});
+$("sessions").onchange = (event) => { if (event.target.value) openSession(event.target.value); };
+$("new").onclick = () => api("/api/open", {method: "POST", headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({cwd: state.cwd})})
+  .then((data) => loadSessions().then(() => { $("sessions").value = data.key; openSession(data.key); }))
+  .catch((error) => { $("banner").textContent = error.message; $("banner").classList.remove("hidden"); });
+$("model").onchange = (event) => {
+  const [provider, id] = event.target.value.split("|");
+  post("model", {provider, id});
+};
+$("thinking").onchange = (event) => post("thinking", {level: event.target.value});
+
+loadSessions();
+setInterval(loadSessions, 10000);
+</script>
+</body>
+</html>
