@@ -1,5 +1,5 @@
 [project]
-name = "openpi"
+name = "openpi-d5"
 version = "0.1.0"
 description = "Desktop control room for the pi coding agent"
 readme = "README.md"
@@ -24,8 +24,11 @@ addopts = "-q -m 'not live'"
 markers = ["live: spawns the real pi binary or needs the network"]
 
 [build-system]
-requires = ["uv_build>=0.13.10,<0.14.0"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openpi"]
 
 [dependency-groups]
 dev = [
