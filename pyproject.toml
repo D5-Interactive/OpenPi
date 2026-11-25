@@ -1,5 +1,5 @@
 [project]
-name = "openpi-d5"
+name = "d5i-openpi"
 version = "0.1.0"
 description = "Desktop control room for the pi coding agent"
 readme = "README.md"

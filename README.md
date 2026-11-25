@@ -17,12 +17,12 @@ self-hosted relay. M3 (git, branches, worktrees) is next — see [`docs/plan.md`
 ## Install
 
 ```bash
-uv tool install openpi-d5           # from PyPI (the `openpi` name was taken; this is the same app)
+uv tool install d5i-openpi         # from PyPI (the `openpi` name was taken; this is the same app)
 # or from source:
 uv tool install git+https://github.com/D5-Interactive/OpenPi
 ```
 
-The installed command is `openpi`; the PyPI distribution is named `openpi-d5` because `openpi`
+The installed command is `openpi`; the PyPI distribution is named `d5i-openpi` because `openpi`
 is reserved on PyPI by Physical Intelligence.
 
 First run creates `~/.openpi/` (override with `OPENPI_HOME`) for `settings.json`, `pairings.json`,
