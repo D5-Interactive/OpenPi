@@ -260,3 +260,58 @@ project.
   stretching `QComboBox`.
 - **Sidebar** — project→sessions tree (`QTreeWidget`), collapsible, hideable via a hamburger
   toggle + `Ctrl+B`; state persists.
+
+## 6. OpenChamber feature parity
+
+Status legend: ✅ done · 🔜 planned (milestone) · ⏭️ pi owns it (openpi renders, never reimplements) · ✖️ non-goal.
+
+| OpenChamber | openpi |
+|---|---|
+| Project + folder grouping | ✅ per-project sidebar tree |
+| Session list, switch, live status | ✅ |
+| Chat streaming (text / thinking / tool / bash) | ✅ |
+| Composer, `/` commands, `@` files | ✅ `/` menu + autocomplete; 🔜 `@` file chips |
+| Context gauge, tokens, cost | ✅ footer |
+| Images in a prompt | ✅ desktop + browser |
+| Permission modes (allow/deny/ask + classifier) | ⏭️ pi has no per-call approval; openpi renders `ctx.ui` dialogs |
+| Notes / todos / plans | 🔜 M4 (repo markdown the agent already reads) |
+| Memory | ⏭️ pi extensions (e.g. rpiv-todo); openpi renders their UI |
+| Goals (audit loop, token budget) | 🔜 M4 (one-shot auditor process) |
+| Leads / workflows (multi-agent) | ✖️ v1; revisit if goals succeed |
+| Scheduled tasks / loops | 🔜 M4 (in-app scheduler, honest "off when closed" note) |
+| Multi-run (one prompt, N models) | 🔜 M4 |
+| Auto model routing (classifier) | ✖️ non-goal |
+| Git: diff, stage, commit message by the agent | 🔜 M3 |
+| Branch sessions (fork/clone/tree) | 🔜 M3 |
+| Worktree sessions | 🔜 M3 |
+| Changes walkthrough (LLM diff summary) | 🔜 M4 |
+| Git hosts (GitHub/GitLab/Gitea/Gerrit) + issue context | 🔜 M3/M4 (local git first, then hosts) |
+| Integrations catalog (~150 services) | ⏭️ pi MCP; 🔜 a read-only MCP/skills panel |
+| Provider / MCP / skills management | ✅ local providers (LM Studio/Ollama/vLLM/llama.cpp/Colibri) + pi `models.json`; 🔜 MCP/skills list |
+| Preview / dev servers | ✖️ non-goal |
+| Project actions (run commands) | 🔜 M5 |
+| Magic prompts / draft starters | 🔜 M5 |
+| Themes | ✅ dark/light/system |
+| Notifications | ✅ tray |
+| Voice (TTS/STT) | ✖️ non-goal |
+| Remote: pairing QR, relay, tunnels, mobile apps | ✅ token + device tokens + relay; ✖️ QR/mobile app |
+| Desktop remote instances (SSH) | ✅ `--connect` (client of a server) |
+| Embedded browser panel | ✖️ non-goal |
+| Extension SDK (untrusted iframe panels) | ⏭️ pi in-process extensions via `ctx.ui`; ✖️ own sandbox |
+
+## 7. Modernization roadmap
+
+Done in the sweep: palette-driven theme (dark/light/system), Ctrl+/- zoom, hideable per-project
+sidebar, searchable/pinnable model picker, settings dialog (appearance / providers / favorites),
+styled scrollbars, and local-server autodetection.
+
+Still open, in rough order:
+
+1. **Command palette** (`Ctrl+K`) covering every action, and `@` file/agent chips in the composer.
+2. **Chat polish** — per-message actions (copy, retry), fenced-code syntax highlighting, tighter
+   message grouping, avatars.
+3. **Narrow layouts** — the header and composer should reflow instead of crowd on small widths;
+   test a few window sizes and HiDPI.
+4. **Session search/filter** in the sidebar tree.
+5. **Browser client parity** — bring the web UI's palette and controls in line with the desktop
+   (it is still dark-only).

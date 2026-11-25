@@ -1,6 +1,6 @@
 [project]
 name = "d5i-openpi"
-version = "0.1.0"
+version = "0.2.0"
 description = "Desktop control room for the pi coding agent"
 readme = "README.md"
 authors = [

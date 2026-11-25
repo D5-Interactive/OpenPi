@@ -99,7 +99,7 @@ creates the GitHub release:
 ```bash
 uv run pytest                    # sanity first
 # bump version in pyproject.toml, then:
-git tag v0.1.0 && git push --tags
+git tag v0.2.0 && git push --tags
 ```
 
 ## Docs
